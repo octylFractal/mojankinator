@@ -4,12 +4,12 @@ mod repository;
 
 use crate::colorize::InfoColors;
 use crate::decompiler::{decompile_version, DecompileArtifact};
-use crate::repository::MojRepository;
+use crate::repository::{MojRepository, SourcePath, TreeBase};
 use chrono::{DateTime, Datelike, Utc};
 use error_stack::{Report, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -128,7 +128,7 @@ fn main() -> MojResult<()> {
         eprintln!(); // Force the progress bar to be printed to console permanently.
         progress_bar.suspend(|| -> MojResult<()> {
             eprintln!("Checking version {}...", version.id.as_important_value());
-            let mut existing_tree = None;
+            let mut tree_base = None;
             let mut existing_info = SavedInfo::default();
             if let Some((tree, info)) = versions_to_tree.get(&version.id) {
                 if info.is_current() {
@@ -139,27 +139,27 @@ fn main() -> MojResult<()> {
                     repo.commit_and_tag(version, info, tree)?;
                     return Ok(());
                 } else {
-                    existing_tree = Some(*tree);
+                    tree_base = Some(TreeBase {
+                        tree: *tree,
+                        paths_to_include: Vec::new(),
+                    });
                     existing_info = info.clone();
                 }
             }
 
             let mut artifacts_needed = Vec::new();
-            if existing_info.decompiled_classes_version < CURRENT_DECOMPILED_CLASSES_VERSION {
-                eprintln!(
-                    "Requesting {} for version {}.",
-                    "decompiled classes".as_important_value(),
-                    version.id.as_important_value()
-                );
-                artifacts_needed.push(DecompileArtifact::DecompiledSources);
-            }
-            if existing_info.libraries_output_version < CURRENT_LIBRARIES_TXT_VERSION {
-                eprintln!(
-                    "Requesting {} for version {}.",
-                    "libraries.txt".as_important_value(),
-                    version.id.as_important_value()
-                );
-                artifacts_needed.push(DecompileArtifact::LibrariesTxt);
+            for artifact in DecompileArtifact::all().iter().copied() {
+                if existing_info.get_artifact_version(artifact) < artifact.version() {
+                    eprintln!(
+                        "Requesting {} for version {}.",
+                        artifact.description().as_important_value(),
+                        version.id.as_important_value()
+                    );
+                    artifacts_needed.push(artifact);
+                } else if let Some(base) = tree_base.as_mut() {
+                    base.paths_to_include
+                        .push(artifact.path_in_repository().to_string());
+                }
             }
 
             let result =
@@ -169,11 +169,14 @@ fn main() -> MojResult<()> {
                 version.id.as_important_value()
             );
             let tree = repo.create_tree(
-                existing_tree,
+                tree_base,
                 &result
                     .artifacts()
-                    .values()
-                    .map(PathBuf::as_path)
+                    .iter()
+                    .map(|(artifact, root)| SourcePath {
+                        root: root.to_path_buf(),
+                        repo_root: artifact.path_in_repository().to_string(),
+                    })
                     .collect::<Vec<_>>(),
             )?;
             repo.commit_and_tag(version, &SavedInfo::current(), &tree)?;
@@ -251,30 +254,32 @@ impl Config {
     }
 }
 
-/// Bumped any time the decompiled classes output changes in any way.
-const CURRENT_DECOMPILED_CLASSES_VERSION: u32 = 1;
-/// Bumped any time the libraries.txt output changes in any way.
-const CURRENT_LIBRARIES_TXT_VERSION: u32 = 1;
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SavedInfo {
     #[serde(default)]
     #[serde(alias = "output_version")]
-    pub decompiled_classes_version: u32,
+    decompiled_classes_version: u32,
     #[serde(default)]
-    pub libraries_output_version: u32,
+    libraries_output_version: u32,
 }
 
 impl SavedInfo {
     pub fn current() -> Self {
         Self {
-            decompiled_classes_version: CURRENT_DECOMPILED_CLASSES_VERSION,
-            libraries_output_version: CURRENT_LIBRARIES_TXT_VERSION,
+            decompiled_classes_version: DecompileArtifact::DecompiledClasses.version(),
+            libraries_output_version: DecompileArtifact::LibrariesTxt.version(),
+        }
+    }
+
+    pub fn get_artifact_version(&self, artifact: DecompileArtifact) -> u32 {
+        match artifact {
+            DecompileArtifact::DecompiledClasses => self.decompiled_classes_version,
+            DecompileArtifact::LibrariesTxt => self.libraries_output_version,
         }
     }
 
     pub fn is_current(&self) -> bool {
-        self.decompiled_classes_version >= CURRENT_DECOMPILED_CLASSES_VERSION
-            && self.libraries_output_version >= CURRENT_LIBRARIES_TXT_VERSION
+        self.decompiled_classes_version >= DecompileArtifact::DecompiledClasses.version()
+            && self.libraries_output_version >= DecompileArtifact::LibrariesTxt.version()
     }
 }

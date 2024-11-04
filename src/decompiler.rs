@@ -44,19 +44,51 @@ pub fn index_parchment_mc_versions(
     map
 }
 
+#[derive(Debug)]
 pub struct DecompileResult {
     artifacts: HashMap<DecompileArtifact, PathBuf>,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum DecompileArtifact {
-    DecompiledSources,
-    LibrariesTxt,
 }
 
 impl DecompileResult {
     pub fn artifacts(&self) -> &HashMap<DecompileArtifact, PathBuf> {
         &self.artifacts
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum DecompileArtifact {
+    DecompiledClasses,
+    LibrariesTxt,
+}
+
+impl DecompileArtifact {
+    pub const fn all() -> &'static [DecompileArtifact] {
+        &[
+            DecompileArtifact::DecompiledClasses,
+            DecompileArtifact::LibrariesTxt,
+        ]
+    }
+
+    pub const fn description(&self) -> &'static str {
+        match self {
+            DecompileArtifact::DecompiledClasses => "decompiled classes",
+            DecompileArtifact::LibrariesTxt => "libraries.txt",
+        }
+    }
+
+    /// Bumped any time the artifact output changes in any way.
+    pub const fn version(&self) -> u32 {
+        match self {
+            DecompileArtifact::DecompiledClasses => 2,
+            DecompileArtifact::LibrariesTxt => 1,
+        }
+    }
+
+    pub fn path_in_repository(&self) -> &str {
+        match self {
+            DecompileArtifact::DecompiledClasses => "src",
+            DecompileArtifact::LibrariesTxt => "libraries.txt",
+        }
     }
 }
 
@@ -81,7 +113,7 @@ pub fn decompile_version(
                 (
                     artifact,
                     work_dir.join(match artifact {
-                        DecompileArtifact::DecompiledSources => "decompiledSources",
+                        DecompileArtifact::DecompiledClasses => "decompiledSources",
                         DecompileArtifact::LibrariesTxt => "build/libraries.txt",
                     }),
                 )
@@ -155,7 +187,7 @@ fn run_decompile_work(
     let mut args = vec!["--stacktrace", "--parallel", "--configuration-cache"];
     for artifact in requested_artifacts {
         match artifact {
-            DecompileArtifact::DecompiledSources => {
+            DecompileArtifact::DecompiledClasses => {
                 args.push("unpackSourcesIntoKnownDir");
             }
             DecompileArtifact::LibrariesTxt => {

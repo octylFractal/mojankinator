@@ -3,7 +3,7 @@ use error_stack::{Report, ResultExt};
 use git2::{Index, IndexEntry, IndexTime, Oid, Repository, Signature, Time};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct MojRepository {
     git_repo: Repository,
@@ -72,28 +72,49 @@ impl MojRepository {
         Ok(())
     }
 
-    pub fn create_tree(&self, base_tree: Option<Oid>, source_files: &[&Path]) -> MojResult<Oid> {
+    pub fn create_tree(
+        &self,
+        base: Option<TreeBase>,
+        source_files: &[SourcePath],
+    ) -> MojResult<Oid> {
         let mut index = self.git_repo.index().change_context(MojError::Commit)?;
 
-        if let Some(base_tree) = base_tree {
+        index
+            .clear()
+            .change_context(MojError::Commit)
+            .attach_printable("Cannot clear index")?;
+
+        if let Some(base) = base {
             let base_tree = self
                 .git_repo
-                .find_tree(base_tree)
+                .find_tree(base.tree)
                 .change_context(MojError::Commit)
                 .attach_printable("Cannot find base tree")?;
             index
                 .read_tree(&base_tree)
                 .change_context(MojError::Commit)?;
+            let mut pathspecs = Vec::with_capacity(1 + base.paths_to_include.len());
+            // Don't match the paths to include
+            for path in &base.paths_to_include {
+                pathspecs.push(format!("!{}", path));
+            }
+            // Include all other paths
+            pathspecs.push("*".to_string());
+            eprintln!("Pathspecs: {:?}", pathspecs);
+            index
+                .remove_all(pathspecs, None)
+                .change_context(MojError::Commit)
+                .attach_printable("Cannot remove paths from index")?;
         }
 
-        for file in source_files {
-            if file.is_file() {
-                add_file_to_index(&mut index, file.parent().unwrap(), file)?;
+        for SourcePath { root, repo_root } in source_files {
+            if root.is_file() {
+                add_file_to_index(&mut index, root.parent().unwrap(), repo_root.as_str(), root)?;
             } else {
-                for entry in walkdir::WalkDir::new(file) {
+                for entry in walkdir::WalkDir::new(root) {
                     let entry = entry.change_context(MojError::Commit)?;
                     if entry.file_type().is_file() {
-                        add_file_to_index(&mut index, file, entry.path())?;
+                        add_file_to_index(&mut index, root, repo_root.as_str(), entry.path())?;
                     } else if entry.file_type().is_dir() {
                         // Skip directories
                     } else {
@@ -184,7 +205,12 @@ impl MojRepository {
     }
 }
 
-fn add_file_to_index(index: &mut Index, root: &Path, file: &Path) -> MojResult<()> {
+fn add_file_to_index(
+    index: &mut Index,
+    root: &Path,
+    repo_root: &str,
+    file: &Path,
+) -> MojResult<()> {
     let stat = file
         .metadata()
         .change_context(MojError::Commit)
@@ -210,9 +236,8 @@ fn add_file_to_index(index: &mut Index, root: &Path, file: &Path) -> MojResult<(
             .attach_printable_lazy(|| format!("Path: {:?}", file))?,
         flags: 0,
         flags_extended: 0,
-        path: file
-            .strip_prefix(root)
-            .unwrap()
+        path: Path::new(repo_root)
+            .join(file.strip_prefix(root).unwrap())
             .as_os_str()
             .as_bytes()
             .to_vec(),
@@ -224,4 +249,18 @@ fn add_file_to_index(index: &mut Index, root: &Path, file: &Path) -> MojResult<(
         .add_frombuffer(&index_entry, &file_contents)
         .change_context(MojError::Commit)
         .attach_printable_lazy(|| format!("Path: {:?}", file))
+}
+
+#[derive(Debug)]
+pub struct TreeBase {
+    /// The tree to base the new tree on
+    pub tree: Oid,
+    /// Paths to include in the new tree
+    pub paths_to_include: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct SourcePath {
+    pub root: PathBuf,
+    pub repo_root: String,
 }
