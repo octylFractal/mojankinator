@@ -15,7 +15,7 @@ I'll be able to take over the Tri-State Area! It's foolproof!" - Dr. Doofenshmir
 Usage
 =====
 This command expects to maintain all of its state in the directory where it is run. It uses a config file in this
-directory named `mojankinator.toml`, which should contain the following fields:
+directory named `config.toml`, which should contain the following fields:
 
 ```toml
 # The minimum version of the game to store in the repository
