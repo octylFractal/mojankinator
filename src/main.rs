@@ -58,7 +58,8 @@ fn main() -> MojResult<()> {
         ureq::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .call()
             .change_context(MojError::FetchVersionManifest)?
-            .into_json::<VersionManifest>()
+            .into_body()
+            .read_json::<VersionManifest>()
             .change_context(MojError::FetchVersionManifest)?
             .versions;
 

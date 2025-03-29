@@ -251,7 +251,7 @@ fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
     let mut temp_file = tempfile::tempfile()
         .change_context(MojError::Decompilation)
         .attach_printable("Failed to create temporary file for Gradle zip")?;
-    std::io::copy(&mut zip_file_req.into_reader(), &mut temp_file)
+    std::io::copy(&mut zip_file_req.into_body().into_reader(), &mut temp_file)
         .change_context(MojError::Decompilation)
         .attach_printable("Failed to download Gradle zip")?;
     {
