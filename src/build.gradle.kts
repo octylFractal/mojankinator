@@ -1,7 +1,7 @@
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 
 plugins {
-    id("fabric-loom") version "1.9.2"
+    id("fabric-loom") version "1.10.5"
     java
 }
 

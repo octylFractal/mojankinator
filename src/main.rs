@@ -118,6 +118,7 @@ fn main() -> MojResult<()> {
     // Now that we have all the trees, rewind the branch to initial state.
     eprintln!("Clearing branch to rebuild...");
     repo.clear_branch()?;
+    repo.clear_index_and_working_tree()?;
 
     let progress_bar = indicatif::ProgressBar::new(versions.len() as u64)
         .with_style(indicatif::ProgressStyle::default_bar().template(
@@ -182,15 +183,17 @@ fn main() -> MojResult<()> {
             )?;
             repo.commit_and_tag(version, &SavedInfo::current(), &tree)?;
             eprintln!("Committed and tagged {}", version.id.as_important_value());
+            // reset everything to the initial state again, since we don't care to preserve anything
+            // on disk
+            repo.clear_index_and_working_tree()?;
             Ok(())
         })?;
         progress_bar.inc(1);
     }
 
-    // Do a reset to ensure that the repository is clean
-    repo.reset()?;
-
     eprintln!("All versions added");
+    // check out the current HEAD again
+    repo.checkout_head()?;
 
     Ok(())
 }

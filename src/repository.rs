@@ -185,22 +185,40 @@ impl MojRepository {
         Ok(())
     }
 
-    pub fn reset(&self) -> MojResult<()> {
+    pub fn checkout_head(&self) -> MojResult<()> {
         self.git_repo
-            .reset(
-                &self
-                    .git_repo
-                    .head()
-                    .change_context(MojError::Reset)
-                    .attach_printable("Cannot find HEAD")?
-                    .peel_to_commit()
-                    .change_context(MojError::Reset)
-                    .attach_printable("HEAD should point to a commit")?
-                    .into_object(),
-                git2::ResetType::Hard,
-                None,
+            .checkout_head(Some(&mut git2::build::CheckoutBuilder::new().force()))
+            .change_context(MojError::Reset)
+            .attach_printable("could not checkout HEAD")?;
+        Ok(())
+    }
+
+    pub fn clear_index_and_working_tree(&self) -> MojResult<()> {
+        let mut index = self
+            .git_repo
+            .index()
+            .change_context(MojError::Reset)
+            .attach_printable("could not get index")?;
+        index
+            .clear()
+            .change_context(MojError::Reset)
+            .attach_printable("could not clear index")?;
+        index
+            .write()
+            .change_context(MojError::Reset)
+            .attach_printable("could not write index")?;
+        // Now update the working tree to be the blank index
+        self.git_repo
+            .checkout_index(
+                Some(&mut index),
+                Some(
+                    &mut git2::build::CheckoutBuilder::new()
+                        .force()
+                        .remove_untracked(true),
+                ),
             )
-            .change_context(MojError::Reset)?;
+            .change_context(MojError::Reset)
+            .attach_printable("could not checkout index")?;
         Ok(())
     }
 }

@@ -80,15 +80,15 @@ impl DecompileArtifact {
     /// Bumped any time the artifact output changes in any way.
     pub const fn version(&self) -> u32 {
         match self {
-            DecompileArtifact::DecompiledClasses => 3,
-            DecompileArtifact::LibrariesTxt => 1,
+            DecompileArtifact::DecompiledClasses => 4,
+            DecompileArtifact::LibrariesTxt => 2,
         }
     }
 
     pub fn path_in_repository(&self) -> &str {
         match self {
             DecompileArtifact::DecompiledClasses => "src",
-            DecompileArtifact::LibrariesTxt => "libraries.txt",
+            DecompileArtifact::LibrariesTxt => "libraries",
         }
     }
 }
@@ -219,7 +219,7 @@ fn run_decompile_work(
 }
 
 fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
-    const GRADLE_VERSION: &str = "8.12";
+    const GRADLE_VERSION: &str = "8.13";
     const GRADLE_RELATIVE_PATH: &str = "gradle-install";
     let relative_dir = work_dir.join(GRADLE_RELATIVE_PATH).join(GRADLE_VERSION);
     let gradle_dir = std::path::absolute(&relative_dir)
