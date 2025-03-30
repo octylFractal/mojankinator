@@ -100,7 +100,6 @@ impl MojRepository {
             }
             // Include all other paths
             pathspecs.push("*".to_string());
-            eprintln!("Pathspecs: {:?}", pathspecs);
             index
                 .remove_all(pathspecs, None)
                 .change_context(MojError::Commit)
