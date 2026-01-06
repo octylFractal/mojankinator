@@ -57,18 +57,18 @@ impl MojRepository {
         self.git_repo
             .set_head_detached(head_ref.resolve().unwrap().target().unwrap())
             .change_context(MojError::Reset)
-            .attach_printable("Cannot detach HEAD")?;
+            .attach("Cannot detach HEAD")?;
         self.git_repo
             .find_branch(&current_branch, git2::BranchType::Local)
             .change_context(MojError::Reset)
-            .attach_printable("HEAD should be a branch")?
+            .attach("HEAD should be a branch")?
             .delete()
             .change_context(MojError::Reset)
-            .attach_printable("Cannot delete branch")?;
+            .attach("Cannot delete branch")?;
         self.git_repo
             .set_head(&format!("refs/heads/{}", current_branch))
             .change_context(MojError::Reset)
-            .attach_printable("Cannot set HEAD to branch")?;
+            .attach("Cannot set HEAD to branch")?;
         Ok(())
     }
 
@@ -82,14 +82,14 @@ impl MojRepository {
         index
             .clear()
             .change_context(MojError::Commit)
-            .attach_printable("Cannot clear index")?;
+            .attach("Cannot clear index")?;
 
         if let Some(base) = base {
             let base_tree = self
                 .git_repo
                 .find_tree(base.tree)
                 .change_context(MojError::Commit)
-                .attach_printable("Cannot find base tree")?;
+                .attach("Cannot find base tree")?;
             index
                 .read_tree(&base_tree)
                 .change_context(MojError::Commit)?;
@@ -103,7 +103,7 @@ impl MojRepository {
             index
                 .remove_all(pathspecs, None)
                 .change_context(MojError::Commit)
-                .attach_printable("Cannot remove paths from index")?;
+                .attach("Cannot remove paths from index")?;
         }
 
         for SourcePath { root, repo_root } in source_files {
@@ -118,9 +118,9 @@ impl MojRepository {
                         // Skip directories
                     } else {
                         return Err(Report::new(MojError::Commit)
-                            .attach_printable("Unknown file type, cannot copy")
-                            .attach_printable(format!("File type: {:?}", entry.file_type()))
-                            .attach_printable(format!("Path: {:?}", entry.path())));
+                            .attach("Unknown file type, cannot copy")
+                            .attach(format!("File type: {:?}", entry.file_type()))
+                            .attach(format!("Path: {:?}", entry.path())));
                     }
                 }
             }
@@ -139,7 +139,7 @@ impl MojRepository {
             .git_repo
             .signature()
             .change_context(MojError::Commit)
-            .attach_printable("Cannot find user to commit with")?;
+            .attach("Cannot find user to commit with")?;
         // Correct the signature with the release time
         let author = Signature::new(
             author.name().unwrap(),
@@ -164,7 +164,7 @@ impl MojRepository {
                     version.id,
                     toml::to_string(saved_info)
                         .change_context(MojError::Commit)
-                        .attach_printable("Failed to serialize commit info")?
+                        .attach("Failed to serialize commit info")?
                 ),
                 &self.git_repo.find_tree(*tree).unwrap(),
                 parent.as_ref().as_slice(),
@@ -188,7 +188,7 @@ impl MojRepository {
         self.git_repo
             .checkout_head(Some(&mut git2::build::CheckoutBuilder::new().force()))
             .change_context(MojError::Reset)
-            .attach_printable("could not checkout HEAD")?;
+            .attach("could not checkout HEAD")?;
         Ok(())
     }
 
@@ -197,15 +197,15 @@ impl MojRepository {
             .git_repo
             .index()
             .change_context(MojError::Reset)
-            .attach_printable("could not get index")?;
+            .attach("could not get index")?;
         index
             .clear()
             .change_context(MojError::Reset)
-            .attach_printable("could not clear index")?;
+            .attach("could not clear index")?;
         index
             .write()
             .change_context(MojError::Reset)
-            .attach_printable("could not write index")?;
+            .attach("could not write index")?;
         // Now update the working tree to be the blank index
         self.git_repo
             .checkout_index(
@@ -217,7 +217,7 @@ impl MojRepository {
                 ),
             )
             .change_context(MojError::Reset)
-            .attach_printable("could not checkout index")?;
+            .attach("could not checkout index")?;
         Ok(())
     }
 }
@@ -231,7 +231,7 @@ fn add_file_to_index(
     let stat = file
         .metadata()
         .change_context(MojError::Commit)
-        .attach_printable_lazy(|| format!("Path: {:?}", file))?;
+        .attach_with(|| format!("Path: {:?}", file))?;
     assert!(stat.is_file(), "Only files can be added to the index");
     let index_entry = IndexEntry {
         ctime: IndexTime::new(
@@ -250,7 +250,7 @@ fn add_file_to_index(
         file_size: stat.size().try_into().unwrap(),
         id: Oid::hash_file(git2::ObjectType::Blob, file)
             .change_context(MojError::Commit)
-            .attach_printable_lazy(|| format!("Path: {:?}", file))?,
+            .attach_with(|| format!("Path: {:?}", file))?,
         flags: 0,
         flags_extended: 0,
         path: Path::new(repo_root)
@@ -261,11 +261,11 @@ fn add_file_to_index(
     };
     let file_contents = std::fs::read(file)
         .change_context(MojError::Commit)
-        .attach_printable_lazy(|| format!("Path: {:?}", file))?;
+        .attach_with(|| format!("Path: {:?}", file))?;
     index
         .add_frombuffer(&index_entry, &file_contents)
         .change_context(MojError::Commit)
-        .attach_printable_lazy(|| format!("Path: {:?}", file))
+        .attach_with(|| format!("Path: {:?}", file))
 }
 
 #[derive(Debug)]

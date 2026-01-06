@@ -34,7 +34,7 @@ enum MojError {
     Reset,
 }
 
-type MojResult<T> = error_stack::Result<T, MojError>;
+type MojResult<T> = Result<T, Report<MojError>>;
 
 fn main() -> MojResult<()> {
     let config = Config::load()?;
@@ -209,15 +209,15 @@ fn verify_release_times(
 ) -> MojResult<(DateTime<Utc>, DateTime<Utc>)> {
     match extracted_release_times {
         (Some(min), Some(max)) => Ok((min, max)),
-        (None, Some(_)) => Err(Report::new(MojError::UserError).attach_printable(format!(
+        (None, Some(_)) => Err(Report::new(MojError::UserError).attach(format!(
             "Minimum version {} not found in version manifest",
             config.min_version
         ))),
-        (Some(_), None) => Err(Report::new(MojError::UserError).attach_printable(format!(
+        (Some(_), None) => Err(Report::new(MojError::UserError).attach(format!(
             "Maximum version {} not found in version manifest",
             config.max_version
         ))),
-        (None, None) => Err(Report::new(MojError::UserError).attach_printable(format!(
+        (None, None) => Err(Report::new(MojError::UserError).attach(format!(
             "Neither minimum version {} nor maximum version {} found in version manifest",
             config.min_version, config.max_version
         ))),
@@ -251,10 +251,10 @@ impl Config {
         let config_path = Path::new("./config.toml");
         let config = std::fs::read_to_string(config_path)
             .change_context(MojError::ReadConfig)
-            .attach_printable_lazy(|| format!("Path: {:?}", config_path))?;
+            .attach_with(|| format!("Path: {:?}", config_path))?;
         toml::from_str(&config)
             .change_context(MojError::ParseConfig)
-            .attach_printable_lazy(|| format!("Path: {:?}", config_path))
+            .attach_with(|| format!("Path: {:?}", config_path))
     }
 }
 

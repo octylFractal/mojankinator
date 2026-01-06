@@ -22,6 +22,15 @@ static PARCHMENT_VERSIONS: LazyLock<LinkedHashMap<&str, &str>> = LazyLock::new(|
     map.insert("1.20.4", "2024.04.14");
     map.insert("1.20.6", "2024.06.16");
     map.insert("1.21", "2024.07.28");
+    map.insert("1.21.1", "2024.11.17");
+    map.insert("1.21.3", "2024.12.07");
+    map.insert("1.21.4", "2025.03.23");
+    map.insert("1.21.5", "2025.06.15");
+    map.insert("1.21.6", "2025.06.29");
+    map.insert("1.21.7", "2025.07.18");
+    map.insert("1.21.8", "2025.09.14");
+    map.insert("1.21.9", "2025.10.05");
+    map.insert("1.21.10", "2025.10.12");
     map
 });
 
@@ -80,7 +89,7 @@ impl DecompileArtifact {
     /// Bumped any time the artifact output changes in any way.
     pub const fn version(&self) -> u32 {
         match self {
-            DecompileArtifact::DecompiledClasses => 4,
+            DecompileArtifact::DecompiledClasses => 5,
             DecompileArtifact::LibrariesTxt => 2,
         }
     }
@@ -103,7 +112,7 @@ pub fn decompile_version(
 
     std::fs::create_dir_all(work_dir)
         .change_context(MojError::Decompilation)
-        .attach_printable("Cannot create decompilation work area")?;
+        .attach("Cannot create decompilation work area")?;
 
     run_decompile_work(version, parchment_mc_version, requested_artifacts, work_dir)?;
 
@@ -138,14 +147,14 @@ fn run_decompile_work(
         include_bytes!("./settings.gradle.kts"),
     )
     .change_context(MojError::Decompilation)
-    .attach_printable("Cannot write settings.gradle.kts")?;
+    .attach("Cannot write settings.gradle.kts")?;
 
     std::fs::write(
         work_dir.join("build.gradle.kts"),
         include_bytes!("./build.gradle.kts"),
     )
     .change_context(MojError::Decompilation)
-    .attach_printable("Cannot write build.gradle.kts")?;
+    .attach("Cannot write build.gradle.kts")?;
 
     std::fs::write(
         work_dir.join("gradle.properties"),
@@ -164,7 +173,7 @@ fn run_decompile_work(
         .as_bytes(),
     )
     .change_context(MojError::Decompilation)
-    .attach_printable("Cannot write gradle.properties")?;
+    .attach("Cannot write gradle.properties")?;
 
     if HAS_STOPPED_DAEMON
         .compare_exchange(
@@ -180,11 +189,10 @@ fn run_decompile_work(
             .current_dir(work_dir)
             .status()
             .change_context(MojError::Decompilation)
-            .attach_printable("Failed to stop Gradle daemon")
-            .attach_printable_lazy(|| format!("Gradle executable: {:?}", &gradle_executable))?;
+            .attach("Failed to stop Gradle daemon")
+            .attach_with(|| format!("Gradle executable: {:?}", &gradle_executable))?;
         if !status.success() {
-            return Err(Report::new(MojError::Decompilation)
-                .attach_printable("Failed to stop Gradle daemon"));
+            return Err(Report::new(MojError::Decompilation).attach("Failed to stop Gradle daemon"));
         }
     }
 
@@ -205,27 +213,27 @@ fn run_decompile_work(
         .current_dir(work_dir)
         .status()
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to execute decompilation")
-        .attach_printable_lazy(|| format!("Gradle executable: {:?}", &gradle_executable))
-        .attach_printable_lazy(|| format!("Version: {}", version.id))?;
+        .attach("Failed to execute decompilation")
+        .attach_with(|| format!("Gradle executable: {:?}", &gradle_executable))
+        .attach_with(|| format!("Version: {}", version.id))?;
 
     if status.success() {
         Ok(())
     } else {
         Err(Report::new(MojError::Decompilation)
-            .attach_printable("Decompilation failed, see above output for details")
-            .attach_printable(format!("Version: {}", version.id)))
+            .attach("Decompilation failed, see above output for details")
+            .attach(format!("Version: {}", version.id)))
     }
 }
 
 fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
-    const GRADLE_VERSION: &str = "8.13";
+    const GRADLE_VERSION: &str = "9.2.1";
     const GRADLE_RELATIVE_PATH: &str = "gradle-install";
     let relative_dir = work_dir.join(GRADLE_RELATIVE_PATH).join(GRADLE_VERSION);
     let gradle_dir = std::path::absolute(&relative_dir)
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to make absolute Gradle directory")
-        .attach_printable_lazy(|| format!("Path: {:?}", &relative_dir))?;
+        .attach("Failed to make absolute Gradle directory")
+        .attach_with(|| format!("Path: {:?}", &relative_dir))?;
     let gradle_executable = gradle_dir.join("bin/gradle");
     if gradle_executable.exists() {
         eprintln!(
@@ -240,28 +248,28 @@ fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
     );
     std::fs::create_dir_all(&gradle_dir)
         .change_context(MojError::Decompilation)
-        .attach_printable("Cannot create Gradle directory")
-        .attach_printable_lazy(|| format!("Path: {:?}", gradle_dir))?;
+        .attach("Cannot create Gradle directory")
+        .attach_with(|| format!("Path: {:?}", gradle_dir))?;
     let url = format!("https://services.gradle.org/distributions/gradle-{GRADLE_VERSION}-bin.zip");
     let zip_file_req = ureq::get(&url)
         .call()
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to start Gradle zip download")
-        .attach_printable_lazy(|| format!("URL: {}", url))?;
+        .attach("Failed to start Gradle zip download")
+        .attach_with(|| format!("URL: {}", url))?;
     let mut temp_file = tempfile::tempfile()
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to create temporary file for Gradle zip")?;
+        .attach("Failed to create temporary file for Gradle zip")?;
     std::io::copy(&mut zip_file_req.into_body().into_reader(), &mut temp_file)
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to download Gradle zip")?;
+        .attach("Failed to download Gradle zip")?;
     {
         let mut zip = zip::ZipArchive::new(temp_file)
             .change_context(MojError::Decompilation)
-            .attach_printable("Failed to open Gradle zip")?;
+            .attach("Failed to open Gradle zip")?;
         zip.extract(&gradle_dir)
             .change_context(MojError::Decompilation)
-            .attach_printable("Failed to extract Gradle zip")
-            .attach_printable_lazy(|| format!("To: {:?}", gradle_dir))?;
+            .attach("Failed to extract Gradle zip")
+            .attach_with(|| format!("To: {:?}", gradle_dir))?;
     }
     // See if it just got unpacked directly
     if gradle_executable.exists() {
@@ -271,54 +279,54 @@ fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
     // find it and move it to the right place.
     let gradle_dir_contents = std::fs::read_dir(&gradle_dir)
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to start reading Gradle directory contents")
-        .attach_printable_lazy(|| format!("Path: {:?}", gradle_dir))?;
+        .attach("Failed to start reading Gradle directory contents")
+        .attach_with(|| format!("Path: {:?}", gradle_dir))?;
     let gradle_dir_contents: Vec<_> = gradle_dir_contents
         .collect::<Result<_, _>>()
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to read Gradle directory contents")
-        .attach_printable_lazy(|| format!("In dir: {:?}", gradle_dir))?;
+        .attach("Failed to read Gradle directory contents")
+        .attach_with(|| format!("In dir: {:?}", gradle_dir))?;
     if gradle_dir_contents.len() != 1 {
         return Err(Report::new(MojError::Decompilation)
-            .attach_printable("Unexpected Gradle directory contents")
-            .attach_printable(format!("Contents: {:?}", gradle_dir_contents))
-            .attach_printable(format!("In dir: {:?}", gradle_dir)));
+            .attach("Unexpected Gradle directory contents")
+            .attach(format!("Contents: {:?}", gradle_dir_contents))
+            .attach(format!("In dir: {:?}", gradle_dir)));
     }
     let file_type = gradle_dir_contents[0]
         .file_type()
         .change_context(MojError::Decompilation)
-        .attach_printable("failed to read file type of Gradle directory entry")?;
+        .attach("failed to read file type of Gradle directory entry")?;
     if !file_type.is_dir() {
         return Err(Report::new(MojError::Decompilation)
-            .attach_printable("Unexpected Gradle directory entry")
-            .attach_printable(format!("{:?} should be dir", file_type))
-            .attach_printable(format!("{:?}", gradle_dir_contents[0].path())));
+            .attach("Unexpected Gradle directory entry")
+            .attach(format!("{:?} should be dir", file_type))
+            .attach(format!("{:?}", gradle_dir_contents[0].path())));
     }
     let subdir_contents = std::fs::read_dir(gradle_dir_contents[0].path())
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to start reading Gradle subdirectory contents")
-        .attach_printable_lazy(|| format!("Path: {:?}", gradle_dir_contents[0].path()))?;
+        .attach("Failed to start reading Gradle subdirectory contents")
+        .attach_with(|| format!("Path: {:?}", gradle_dir_contents[0].path()))?;
     for entry in subdir_contents {
         let entry = entry
             .change_context(MojError::Decompilation)
-            .attach_printable("Failed to read Gradle subdirectory entry")
-            .attach_printable_lazy(|| format!("In dir: {:?}", gradle_dir_contents[0].path()))?;
+            .attach("Failed to read Gradle subdirectory entry")
+            .attach_with(|| format!("In dir: {:?}", gradle_dir_contents[0].path()))?;
         let source = entry.path();
         let dest = gradle_dir.join(entry.file_name());
         std::fs::rename(&source, &dest)
             .change_context(MojError::Decompilation)
-            .attach_printable("Failed to move Gradle subdirectory entry")
-            .attach_printable_lazy(|| format!("From: {:?}", source))
-            .attach_printable_lazy(|| format!("To: {:?}", dest))?;
+            .attach("Failed to move Gradle subdirectory entry")
+            .attach_with(|| format!("From: {:?}", source))
+            .attach_with(|| format!("To: {:?}", dest))?;
     }
     std::fs::remove_dir(gradle_dir_contents[0].path())
         .change_context(MojError::Decompilation)
-        .attach_printable("Failed to remove Gradle subdirectory")
-        .attach_printable_lazy(|| format!("Path: {:?}", gradle_dir_contents[0].path()))?;
+        .attach("Failed to remove Gradle subdirectory")
+        .attach_with(|| format!("Path: {:?}", gradle_dir_contents[0].path()))?;
     if !gradle_executable.exists() {
         return Err(Report::new(MojError::Decompilation)
-            .attach_printable("Gradle executable not found after extraction")
-            .attach_printable(format!("Path: {:?}", gradle_executable)));
+            .attach("Gradle executable not found after extraction")
+            .attach(format!("Path: {:?}", gradle_executable)));
     }
     Ok(gradle_executable)
 }

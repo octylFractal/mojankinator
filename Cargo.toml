@@ -5,28 +5,28 @@ edition = "2021"
 license = "AGPL-3"
 
 [dependencies]
-indicatif = "0.17.11"
-git2 = "0.20.1"
+indicatif = "0.18.3"
+git2 = "0.20.3"
 walkdir = "2.5.0"
 linked-hash-map = "0.5.6"
-toml = "0.8.20"
-error-stack = "0.5.0"
-thiserror = "2.0.12"
-tempfile = "3.19.1"
-zip = "2.5.0"
+toml = "0.9.10"
+error-stack = "0.6.0"
+thiserror = "2.0.17"
+tempfile = "3.24.0"
+zip = "7.0.0"
 
 [dependencies.chrono]
-version = "0.4.40"
+version = "0.4.42"
 features = ["serde"]
 
 [dependencies.ureq]
-version = "3.0.10"
+version = "3.1.4"
 features = ["json"]
 
 [dependencies.serde]
-version = "1.0.219"
+version = "1.0.228"
 features = ["derive"]
 
 [dependencies.owo-colors]
-version = "4.2.0"
+version = "4.2.3"
 features = ["supports-colors"]
