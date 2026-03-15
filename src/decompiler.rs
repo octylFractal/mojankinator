@@ -7,6 +7,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::LazyLock;
+use chrono::{DateTime, Utc};
 
 static PARCHMENT_VERSIONS: LazyLock<LinkedHashMap<&str, &str>> = LazyLock::new(|| {
     let mut map = LinkedHashMap::new();
@@ -31,6 +32,7 @@ static PARCHMENT_VERSIONS: LazyLock<LinkedHashMap<&str, &str>> = LazyLock::new(|
     map.insert("1.21.8", "2025.09.14");
     map.insert("1.21.9", "2025.10.05");
     map.insert("1.21.10", "2025.10.12");
+    map.insert("1.21.11", "2025.12.20");
     map
 });
 
@@ -134,6 +136,23 @@ pub fn decompile_version(
 
 static HAS_STOPPED_DAEMON: AtomicBool = AtomicBool::new(false);
 
+fn get_build_gradle_text(version: &Version) -> String {
+    const NOMAP_TEXT: &str = include_str!("./build-nomap.gradle.kts.tmpl");
+    const REMAP_TEXT: &str = include_str!("./build-remap.gradle.kts.tmpl");
+    const FABRIC_LOOM_VERSION: &str = "1.15.5";
+    /// The date that 26.1-snapshot-1 was released, signaling the start of only unmapped artifacts.
+    static NOMAP_START_DATE: LazyLock<DateTime<Utc>> = LazyLock::new(||
+        DateTime::parse_from_rfc3339("2025-12-16T12:42:29+00:00").unwrap().to_utc()
+    );
+
+    let text = if version.release_time < *NOMAP_START_DATE {
+        REMAP_TEXT
+    } else {
+        NOMAP_TEXT
+    };
+    text.replace("%LOOM_VERSION%", FABRIC_LOOM_VERSION)
+}
+
 fn run_decompile_work(
     version: &Version,
     parchment_mc_version: Option<&str>,
@@ -151,7 +170,7 @@ fn run_decompile_work(
 
     std::fs::write(
         work_dir.join("build.gradle.kts"),
-        include_bytes!("./build.gradle.kts"),
+        get_build_gradle_text(version).as_bytes(),
     )
     .change_context(MojError::Decompilation)
     .attach("Cannot write build.gradle.kts")?;
@@ -227,7 +246,7 @@ fn run_decompile_work(
 }
 
 fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
-    const GRADLE_VERSION: &str = "9.2.1";
+    const GRADLE_VERSION: &str = "9.4.0";
     const GRADLE_RELATIVE_PATH: &str = "gradle-install";
     let relative_dir = work_dir.join(GRADLE_RELATIVE_PATH).join(GRADLE_VERSION);
     let gradle_dir = std::path::absolute(&relative_dir)

@@ -1,7 +1,7 @@
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 
 plugins {
-    id("fabric-loom") version "1.14.10"
+    id("net.fabricmc.fabric-loom") version "%LOOM_VERSION%"
     java
 }
 
@@ -10,19 +10,11 @@ repositories {
         name = "Fabric"
         url = uri("https://maven.fabricmc.net/")
     }
-    maven {
-        name = "ParchmentMC"
-        url = uri("https://maven.parchmentmc.org")
-    }
     mavenCentral()
 }
 
 dependencies {
     "minecraft"("com.mojang:minecraft:${project.properties["minecraft_version"]}")
-    "mappings"(loom.layered {
-       officialMojangMappings()
-       parchment("org.parchmentmc.data:parchment-${project.properties["parchment_mc_version"]}:${project.properties["parchment_version"]}")
-    })
 }
 
 afterEvaluate {
@@ -55,4 +47,4 @@ tasks.register("exportLibraries") {
     }
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
