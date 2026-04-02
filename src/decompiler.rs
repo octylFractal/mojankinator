@@ -246,7 +246,7 @@ fn run_decompile_work(
 }
 
 fn fetch_gradle(work_dir: &Path) -> MojResult<PathBuf> {
-    const GRADLE_VERSION: &str = "9.4.0";
+    const GRADLE_VERSION: &str = "9.4.1";
     const GRADLE_RELATIVE_PATH: &str = "gradle-install";
     let relative_dir = work_dir.join(GRADLE_RELATIVE_PATH).join(GRADLE_VERSION);
     let gradle_dir = std::path::absolute(&relative_dir)
