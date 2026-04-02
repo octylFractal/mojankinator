@@ -198,7 +198,16 @@ fn main() -> MojResult<()> {
     Ok(())
 }
 
+// For now, manually categorize exceptions.
+// If Mojang keeps doing this in the future, I'd ask them to flag these versions explicitly.
+static NOT_APRIL_FOOLS_VERSION_IDS: [&str; 1] = [
+    "26.1.1"
+];
+
 fn is_april_fools(version: &Version) -> bool {
+    if NOT_APRIL_FOOLS_VERSION_IDS.contains(&version.id.as_str()) {
+        return false;
+    }
     version.release_time.month() == chrono::Month::April.number_from_month()
         && version.release_time.day() == 1
 }
